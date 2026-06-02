@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geometry Racers V3 Professional</title>
+<style>
+body{margin:0;overflow:hidden;font-family:Arial}
+#hud{position:fixed;top:10px;left:10px;color:#fff;background:rgba(0,0,0,.7);padding:12px;border-radius:10px;z-index:10}
+#msg{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:white;background:rgba(0,0,0,.7);padding:10px;border-radius:10px;display:none}
+</style>
+</head>
+<body>
+<div id="hud">
+<h3>🏎️ Geometry Racers V3</h3>
+Puntos: <span id="score">0</span><br>
+Monedas: <span id="coins">0</span><br>
+Velocidad: <span id="speed">0</span><br>
+Vueltas: <span id="laps">0</span>/3
+</div>
+<div id="msg"></div>
+
+<script type="module">
+import * as THREE from "https://unpkg.com/three@0.165.0/build/three.module.js";
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1000);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff,2));
+
+const sun=new THREE.DirectionalLight(0xffffff,2);
+sun.position.set(10,20,10);
+scene.add(sun);
+
+const ground=new THREE.Mesh(
+new THREE.PlaneGeometry(500,500),
+new THREE.MeshStandardMaterial({color:0x3fa34d})
+);
+ground.rotation.x=-Math.PI/2;
+scene.add(ground);
+
+const road=new THREE.Mesh(
+new THREE.BoxGeometry(30,0.2,400),
+new THREE.MeshStandardMaterial({color:0x303030})
+);
+scene.add(road);
+
+const player=new THREE.Mesh(
+new THREE.BoxGeometry(2,1,4),
+new THREE.MeshStandardMaterial({color:0xff2222})
+);
+player.position.set(0,1,150);
+scene.add(player);
+
+const ai=new THREE.Mesh(
+new THREE.BoxGeometry(2,1,4),
+new THREE.MeshStandardMaterial({color:0x2222ff})
+);
+ai.position.set(3,1,150);
+scene.add(ai);
+
+const coins=[];
+for(let i=0;i<20;i++){
+ const c=new THREE.Mesh(
+  new THREE.SphereGeometry(0.7),
+  new THREE.MeshStandardMaterial({color:0xffd700})
+ );
+ c.position.set((Math.random()*20)-10,1,140-i*15);
+ scene.add(c);
+ coins.push(c);
+}
+
+const checkpoints=[];
+for(let i=0;i<12;i++){
+ const cp=new THREE.Mesh(
+  new THREE.BoxGeometry(3,3,3),
+  new THREE.MeshStandardMaterial({color:0xffff00})
+ );
+ cp.position.set((Math.random()*16)-8,1.5,120-i*25);
+ scene.add(cp);
+ checkpoints.push(cp);
+}
+
+camera.position.set(0,6,10);
+
+let speed=0,score=0,coinCount=0,laps=0;
+const keys={};
+
+const questions=[
+["¿Ángulo de 90°?","recto"],
+["Transformación que gira una figura","rotacion"],
+["Transformación espejo","reflexion"],
+["1000 m equivalen a cuántos km","1"],
+["1 inch equivale a cuántos cm","2.54"],
+["Transformación que cambia tamaño","dilatacion"]
+];
+
+function show(t){
+ const m=document.getElementById("msg");
+ m.style.display="block";
+ m.innerText=t;
+ setTimeout(()=>m.style.display="none",2500);
+}
+
+function ask(){
+ const q=questions[Math.floor(Math.random()*questions.length)];
+ const r=prompt(q[0]);
+ if(r && r.toLowerCase()==q[1].toLowerCase()){
+   score+=20;
+   speed+=0.05;
+   show("✅ Correcto + Turbo");
+ } else {
+   show("❌ Respuesta: "+q[1]);
+ }
+}
+
+addEventListener("keydown",e=>keys[e.key]=true);
+addEventListener("keyup",e=>keys[e.key]=false);
+
+function updateHUD(){
+ scoreEl.textContent=score;
+ coinsEl.textContent=coinCount;
+ speedEl.textContent=Math.floor(speed*100);
+ lapsEl.textContent=laps;
+}
+
+const scoreEl=document.getElementById("score");
+const coinsEl=document.getElementById("coins");
+const speedEl=document.getElementById("speed");
+const lapsEl=document.getElementById("laps");
+
+function animate(){
+ requestAnimationFrame(animate);
+
+ if(keys["ArrowUp"]||keys["w"]) speed=Math.min(speed+0.003,0.8);
+ else speed*=0.985;
+
+ if(keys["ArrowLeft"]||keys["a"]) player.position.x-=0.2;
+ if(keys["ArrowRight"]||keys["d"]) player.position.x+=0.2;
+
+ if(keys["Shift"]) speed=Math.min(speed+0.01,1);
+
+ player.position.z-=speed;
+
+ ai.position.z-=0.35;
+
+ coins.forEach(c=>{
+   c.rotation.y+=0.05;
+   if(c.visible && player.position.distanceTo(c.position)<2){
+      c.visible=false;
+      coinCount++;
+      score+=5;
+   }
+ });
+
+ checkpoints.forEach(cp=>{
+   cp.rotation.y+=0.03;
+   if(cp.visible && player.position.distanceTo(cp.position)<3){
+      cp.visible=false;
+      ask();
+   }
+ });
+
+ if(player.position.z<-160){
+   laps++;
+   player.position.z=150;
+   if(laps>=3){
+      alert("🏆 ¡Ganaste! Puntuación: "+score);
+      location.reload();
+   }
+ }
+
+ camera.position.x=player.position.x;
+ camera.position.z=player.position.z+10;
+ camera.lookAt(player.position);
+
+ updateHUD();
+ renderer.render(scene,camera);
+}
+
+animate();
+
+addEventListener("resize",()=>{
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
